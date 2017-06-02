@@ -74,6 +74,7 @@ class Pool(asyncio.AbstractServer):
         self._terminated = set()
         self._closing = False
         self._closed = False
+        self._lock = asyncio.Lock()
 
     @property
     def echo(self):
@@ -158,7 +159,8 @@ class Pool(asyncio.AbstractServer):
 
     def acquire(self):
         """Acquire free connection from the pool."""
-        coro = self._acquire()
+        with (yield from self._lock):
+            coro = self._acquire()
         return _PoolAcquireContextManager(coro, self)
 
     @asyncio.coroutine
