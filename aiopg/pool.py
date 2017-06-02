@@ -159,27 +159,27 @@ class Pool(asyncio.AbstractServer):
 
     def acquire(self):
         """Acquire free connection from the pool."""
-        with (yield from self._lock):
-            coro = self._acquire()
+        coro = self._acquire()
         return _PoolAcquireContextManager(coro, self)
 
     @asyncio.coroutine
     def _acquire(self):
         if self._closing:
             raise RuntimeError("Cannot acquire connection after closing pool")
-        with (yield from self._cond):
-            while True:
-                yield from self._fill_free_pool(True)
-                if self._free:
-                    conn = self._free.popleft()
-                    assert not conn.closed, conn
-                    assert conn not in self._used, (conn, self._used)
-                    self._used.add(conn)
-                    if self._on_connect is not None:
-                        yield from self._on_connect(conn)
-                    return conn
-                else:
-                    yield from self._cond.wait()
+        with (yield from self._lock):
+            with (yield from self._cond):
+                while True:
+                    yield from self._fill_free_pool(True)
+                    if self._free:
+                        conn = self._free.popleft()
+                        assert not conn.closed, conn
+                        assert conn not in self._used, (conn, self._used)
+                        self._used.add(conn)
+                        if self._on_connect is not None:
+                            yield from self._on_connect(conn)
+                        return conn
+                    else:
+                        yield from self._cond.wait()
 
     @asyncio.coroutine
     def _fill_free_pool(self, override_min):
